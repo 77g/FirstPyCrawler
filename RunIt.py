@@ -20,3 +20,4 @@ import requests
 # cl.start()
 resp = requests.get("http://google.com")
 print resp.content
+print resp.text
