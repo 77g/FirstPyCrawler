@@ -3,6 +3,8 @@ from API.Fetch import SogouAPI
 from Queue import Queue
 from threading import Thread
 
+import json
+import hashlib
 
 
 class CrawlerThread(Thread):
@@ -12,12 +14,27 @@ class CrawlerThread(Thread):
         Thread.__init__(self)
 
     def run(self):
-        n = 2
         # 1. info = queue.get => what is in the queue?
         # 2. m.update(info['url']) seems a kv pair, this is an URL
-        while n > 0:
-            print "run %d time" % n
-            n -= 1
+        while True:
+            info = self.queue.get()
+            m = hashlib.md5()  # what is this?
+            m.update(info['url'])
+            unique_name = m.hexdigest()  # what is this?
+            if 'profile' in info['url']:
+                arts = self.sogou_api.fetch_history_urls_from_profile(info['url'])
+                f = open(u'Content/%s' % unique_name, 'a')
+                f.write(json.dump(arts).encode('utf-8'))
+                f.close()
+
+                for art in arts:
+                    self.queue.put({'url': art['content_url'], 'title': art['title']})
+            else:
+                art = self.sogou_api.fetch(info['url'])
+                f = open(u'Content/%s.html' % unique_name, 'w')
+                f.write(art.encode('utf-8'))
+                f.close()
+            self.queue.task_done()
 
 
 class Crawler:
@@ -33,5 +50,10 @@ class Crawler:
             crawler_thread.start()
 
     def start(self):
-        pass
+        print 'Start to processing...'
+        gzh_info = self.sogou_api.fetch_gzh_info(keyword='九章算法')
+        for info in gzh_info:
+            self.queue.put({'url': info['profile_url'], 'title': info['wechat_id']})
 
+        self.queue.join()
+        print 'Finish'
